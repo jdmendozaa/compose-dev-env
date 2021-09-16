@@ -3,8 +3,8 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -16,11 +16,28 @@ import (
 )
 
 func connect() (*sql.DB, error) {
-	bin, err := ioutil.ReadFile("/run/secrets/db-password")
-	if err != nil {
-		return nil, err
+	dbPassword := os.Getenv("MARIADB_PASSWORD")
+	dbHost := os.Getenv("MARIADB_HOST")
+	dbPort := os.Getenv("MARIADB_PORT")
+	dbDatabase := os.Getenv("MARIADB_DATABASE")
+
+	if dbPort == "" {
+		dbPort = "3306"
 	}
-	return sql.Open("mysql", fmt.Sprintf("root:%s@tcp(db:3306)/example", string(bin)))
+
+	if dbPassword == "" {
+		return nil, errors.New("environment variable MARIADB_PASSWORD is not set")
+	}
+
+	if dbHost == "" {
+		return nil, errors.New("environment variable MARIADB_HOST is not set")
+	}
+
+	if dbDatabase == "" {
+		return nil, errors.New("environment variable MARIADB_DATABASE is not set")
+	}
+
+	return sql.Open("mysql", fmt.Sprintf("root:%s@tcp(%s:%s)/%s", dbPassword, dbHost, dbPort, dbDatabase))
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +61,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(titles)
 }
+
 
 func main() {
 	log.Print("Prepare db...")
